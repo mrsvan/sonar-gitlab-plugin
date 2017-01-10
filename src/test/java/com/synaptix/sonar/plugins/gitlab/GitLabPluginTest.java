@@ -1,6 +1,6 @@
 /*
  * SonarQube :: GitLab Plugin
- * Copyright (C) 2016-2016 Talanlabs
+ * Copyright (C) 2016-2017 Talanlabs
  * gabriel.allaigre@talanlabs.com
  *
  * This program is free software; you can redistribute it and/or
@@ -19,15 +19,24 @@
  */
 package com.synaptix.sonar.plugins.gitlab;
 
-import org.junit.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import org.junit.Test;
+import org.sonar.api.Plugin;
+import org.sonar.api.SonarRuntime;
+import org.sonar.api.utils.Version;
 
 public class GitLabPluginTest {
 
   @Test
   public void uselessTest() {
-    assertThat(new GitLabPlugin().getExtensions().size()).isGreaterThan(1);
-  }
+      SonarRuntime mockRuntime = mock(SonarRuntime.class);
+      when(mockRuntime.getApiVersion()).thenReturn(Version.create(6, 2));
 
+      Plugin.Context context = new Plugin.Context(mockRuntime);
+      new GitLabPlugin().define(context);
+      assertThat(context.getExtensions().size()).isGreaterThan(1);
+  }
 }

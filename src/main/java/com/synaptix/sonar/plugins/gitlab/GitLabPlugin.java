@@ -1,6 +1,6 @@
 /*
  * SonarQube :: GitLab Plugin
- * Copyright (C) 2016-2016 Talanlabs
+ * Copyright (C) 2016-2017 Talanlabs
  * gabriel.allaigre@talanlabs.com
  *
  * This program is free software; you can redistribute it and/or
@@ -19,16 +19,58 @@
  */
 package com.synaptix.sonar.plugins.gitlab;
 
+import org.sonar.api.Plugin;
+import org.sonar.api.Properties;
+import org.sonar.api.Property;
 import org.sonar.api.PropertyType;
-import org.sonar.api.SonarPlugin;
-import org.sonar.api.config.PropertyDefinition;
-import org.sonar.api.resources.Qualifiers;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-public class GitLabPlugin extends SonarPlugin {
+@Properties({
+    @Property(
+      key = GitLabPlugin.GITLAB_URL,
+      defaultValue = "https://gitlab.com",
+      name = "GitLab URL",
+      description = "URL to access GitLab."),
+    @Property(
+      key = GitLabPlugin.GITLAB_IGNORE_CERT,
+      defaultValue = "false",
+      name = "GitLab Ignore Certificate",
+      description = "Ignore Certificate for access GitLab.",
+      type = PropertyType.BOOLEAN),
+    @Property(
+      key = GitLabPlugin.GITLAB_MAX_GLOBAL_ISSUES,
+      defaultValue = "10",
+      name = "GitLab Max Global Issues",
+      description = "Max issues to show in global comment.",
+      type = PropertyType.INTEGER),
+    @Property(
+      key = GitLabPlugin.GITLAB_USER_TOKEN,
+      name = "GitLab User Token",
+      description = "GitLab user token.",
+      type = PropertyType.PASSWORD),
+    @Property(
+      key = GitLabPlugin.GITLAB_PROJECT_ID,
+      name = "GitLab Project id",
+      description = "The unique id of the GitLab project.",
+      project = true,
+      global = false),
+    @Property(
+      key = GitLabPlugin.GITLAB_COMMIT_SHA,
+      name = "GitLab Commit SHA",
+      description = "The commit revision for which project is built.",
+      global = false),
+    @Property(
+      key = GitLabPlugin.GITLAB_REF_NAME,
+      name = "GitLab Ref Name",
+      description = "The commit revision for which project is built.",
+      global = false),
+    @Property(
+      key = GitLabPlugin.GITLAB_IGNORE_FILE,
+      defaultValue = "true",
+      name = "GitLab Ignore file",
+      description = "Ignore issues on files no modified by the commit.",
+      type = PropertyType.BOOLEAN)
+  })
+public class GitLabPlugin implements Plugin {
 
     public static final String GITLAB_URL = "sonar.gitlab.url";
     public static final String GITLAB_IGNORE_CERT = "sonar.gitlab.ignore_certificate";
@@ -41,38 +83,13 @@ public class GitLabPlugin extends SonarPlugin {
     public static final String GITLAB_GLOBAL_TEMPLATE = "sonar.gitlab.global_template";
     public static final String GITLAB_INLINE_TEMPLATE = "sonar.gitlab.inline_template";
 
-    public static final String CATEGORY = "gitlab";
-    public static final String SUBCATEGORY = "reporting";
-
-    private static List<PropertyDefinition> definitions() {
-        return Arrays
-                .asList(PropertyDefinition.builder(GITLAB_URL).name("GitLab URL").description("URL to access GitLab.").category(CATEGORY).subCategory(SUBCATEGORY).defaultValue("https://gitlab.com")
-                                .index(1).build(), PropertyDefinition.builder(GITLAB_IGNORE_CERT).name("GitLab Ignore Certificate").description("Ignore Certificate for access GitLab.").category(CATEGORY)
-                                .subCategory(SUBCATEGORY).type(PropertyType.BOOLEAN).defaultValue(String.valueOf(false)).index(2).build(),
-                        PropertyDefinition.builder(GITLAB_USER_TOKEN).name("GitLab User Token").description("GitLab user token is developer role.").category(CATEGORY).subCategory(SUBCATEGORY).index(3)
-                                .build(), PropertyDefinition.builder(GITLAB_MAX_GLOBAL_ISSUES).name("GitLab Max Global Issues").description("Max issues to show in global comment.").category(CATEGORY)
-                                .subCategory(SUBCATEGORY).type(PropertyType.INTEGER).defaultValue(String.valueOf(10)).index(4).build(),
-                        PropertyDefinition.builder(GITLAB_PROJECT_ID).name("GitLab Project id")
-                                .description("The unique id, path with namespace, name with namespace, web url, ssh url or http url of the current project that GitLab.").category(CATEGORY)
-                                .subCategory(SUBCATEGORY).index(5).onlyOnQualifiers(Qualifiers.PROJECT).build(),
-                        PropertyDefinition.builder(GITLAB_COMMIT_SHA).name("GitLab Commit SHA").description("The commit revision for which project is built.").category(CATEGORY)
-                                .subCategory(SUBCATEGORY).index(6).hidden().build(),
-                        PropertyDefinition.builder(GITLAB_REF_NAME).name("GitLab Ref Name").description("The commit revision for which project is built.").category(CATEGORY).subCategory(SUBCATEGORY)
-                                .index(7).hidden().build(),
-                        PropertyDefinition.builder(GITLAB_IGNORE_FILE).name("GitLab Ingore file").description("Ignore issues on files no modified by the commit").category(CATEGORY)
-                                .subCategory(SUBCATEGORY).type(PropertyType.BOOLEAN).defaultValue(String.valueOf(false)).index(7).hidden().build()/*,
-                        PropertyDefinition.builder(GITLAB_GLOBAL_TEMPLATE).name("GitLab Global Template").description("Template for global comment in commit.").category(CATEGORY)
-                                .subCategory(SUBCATEGORY).type(PropertyType.TEXT).index(8).build(),
-                        PropertyDefinition.builder(GITLAB_INLINE_TEMPLATE).name("GitLab Inline Template").description("Template for inline comment in commit.").category(CATEGORY)
-                                .subCategory(SUBCATEGORY).type(PropertyType.TEXT).index(9).build()*/);
-    }
-
     @Override
-    public List getExtensions() {
-        List extensions = new ArrayList();
-        extensions.addAll(Arrays.asList(CommitIssuePostJob.class, GitLabPluginConfiguration.class, CommitProjectBuilder.class, CommitFacade.class, InputFileCacheSensor.class, InputFileCache.class,
-                MarkDownUtils.class));
-        extensions.addAll(definitions());
-        return extensions;
+    public void define(Context context) {
+        context.addExtensions(
+		    CommitIssuePostJob.class,
+		    GitLabPluginConfiguration.class,
+		    CommitProjectBuilder.class,
+		    CommitFacade.class,
+            MarkDownUtils.class);
     }
 }

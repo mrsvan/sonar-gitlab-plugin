@@ -1,6 +1,6 @@
 /*
  * SonarQube :: GitLab Plugin
- * Copyright (C) 2016-2016 Talanlabs
+ * Copyright (C) 2016-2017 Talanlabs
  * gabriel.allaigre@talanlabs.com
  *
  * This program is free software; you can redistribute it and/or
@@ -19,14 +19,14 @@
  */
 package com.synaptix.sonar.plugins.gitlab;
 
-import org.sonar.api.batch.BatchSide;
 import org.sonar.api.batch.InstantiationStrategy;
+import org.sonar.api.batch.ScannerSide;
 import org.sonar.api.config.Settings;
 
 import javax.annotation.CheckForNull;
 
 @InstantiationStrategy(InstantiationStrategy.PER_BATCH)
-@BatchSide
+@ScannerSide
 public class GitLabPluginConfiguration {
 
     private Settings settings;
@@ -56,7 +56,9 @@ public class GitLabPluginConfiguration {
     }
 
     public boolean isEnabled() {
-        return settings.hasKey(GitLabPlugin.GITLAB_COMMIT_SHA);
+        return settings.hasKey(GitLabPlugin.GITLAB_COMMIT_SHA)
+                && settings.hasKey(GitLabPlugin.GITLAB_REF_NAME)
+                && settings.hasKey(GitLabPlugin.GITLAB_PROJECT_ID);
     }
 
     @CheckForNull
@@ -75,7 +77,7 @@ public class GitLabPluginConfiguration {
     }
 
     @CheckForNull
-    public boolean ignoreFileNotModified() {
+    public boolean ignoreFileNotInCommit() {
         return settings.getBoolean(GitLabPlugin.GITLAB_IGNORE_FILE);
     }
 

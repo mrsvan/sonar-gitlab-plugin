@@ -1,6 +1,6 @@
 /*
  * SonarQube :: GitLab Plugin
- * Copyright (C) 2016-2016 Talanlabs
+ * Copyright (C) 2016-2017 Talanlabs
  * gabriel.allaigre@talanlabs.com
  *
  * This program is free software; you can redistribute it and/or
@@ -19,45 +19,45 @@
  */
 package com.synaptix.sonar.plugins.gitlab;
 
-import org.sonar.api.batch.CheckProject;
-import org.sonar.api.batch.SensorContext;
-import org.sonar.api.batch.fs.InputFile;
-import org.sonar.api.issue.Issue;
-import org.sonar.api.issue.ProjectIssues;
-import org.sonar.api.resources.Project;
-
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.StreamSupport;
+
+import org.sonar.api.batch.fs.InputComponent;
+import org.sonar.api.batch.fs.InputFile;
+import org.sonar.api.batch.postjob.PostJob;
+import org.sonar.api.batch.postjob.PostJobContext;
+import org.sonar.api.batch.postjob.PostJobDescriptor;
+import org.sonar.api.batch.postjob.issue.PostJobIssue;
 
 /**
  * Compute comments to be added on the commit.
  */
-public class CommitIssuePostJob implements org.sonar.api.batch.PostJob, CheckProject {
+public class CommitIssuePostJob implements PostJob {
+    private static final Comparator<PostJobIssue> ISSUE_COMPARATOR = new IssueComparator();
 
     private final GitLabPluginConfiguration gitLabPluginConfiguration;
     private final CommitFacade commitFacade;
-    private final ProjectIssues projectIssues;
-    private final InputFileCache inputFileCache;
     private final MarkDownUtils markDownUtils;
 
-    public CommitIssuePostJob(GitLabPluginConfiguration gitLabPluginConfiguration, CommitFacade commitFacade, ProjectIssues projectIssues, InputFileCache inputFileCache, MarkDownUtils markDownUtils) {
+    public CommitIssuePostJob(GitLabPluginConfiguration gitLabPluginConfiguration, CommitFacade commitFacade, MarkDownUtils markDownUtils) {
         this.gitLabPluginConfiguration = gitLabPluginConfiguration;
         this.commitFacade = commitFacade;
-        this.projectIssues = projectIssues;
-        this.inputFileCache = inputFileCache;
         this.markDownUtils = markDownUtils;
     }
 
     @Override
-    public boolean shouldExecuteOnProject(Project project) {
-        return gitLabPluginConfiguration.isEnabled();
+    public void describe(PostJobDescriptor descriptor) {
+	descriptor.name("GitLab Commit Issue Publisher").requireProperties(GitLabPlugin.GITLAB_COMMIT_SHA,
+		GitLabPlugin.GITLAB_REF_NAME);
     }
 
     @Override
-    public void executeOn(Project project, SensorContext context) {
-        GlobalReport report = new GlobalReport(gitLabPluginConfiguration, markDownUtils);
+    public void execute(PostJobContext context) {
+        GlobalReport report = new GlobalReport(gitLabPluginConfiguration.maxGlobalIssues(), markDownUtils);
 
-        Map<InputFile, Map<Integer, StringBuilder>> commentsToBeAddedByLine = processIssues(report);
+        Map<InputFile, Map<Integer, StringBuilder>> commentsToBeAddedByLine = processIssues(report, context.issues());
 
         updateReviewComments(commentsToBeAddedByLine);
 
@@ -68,45 +68,54 @@ public class CommitIssuePostJob implements org.sonar.api.batch.PostJob, CheckPro
         commitFacade.createOrUpdateSonarQubeStatus(report.getStatus(), report.getStatusDescription());
     }
 
-    @Override
-    public String toString() {
-        return "GitLab Commit Issue Publisher";
+    private Map<InputFile, Map<Integer, StringBuilder>> processIssues(GlobalReport report, Iterable<PostJobIssue> issues) {
+        Map<InputFile, Map<Integer, StringBuilder>> commentToBeAddedByFileAndByLine = new HashMap<>();
+        StreamSupport.stream(issues.spliterator(), false)
+                     .filter(PostJobIssue::isNew)
+                     .filter(i -> {
+                     InputComponent inputComponent = i.inputComponent();
+                     return inputComponent == null || !inputComponent.isFile()
+                                 || commitFacade.hasFile((InputFile) inputComponent)
+                                 || !gitLabPluginConfiguration.ignoreFileNotInCommit();
+                     })
+                     .sorted(ISSUE_COMPARATOR)
+                     .forEach(i -> processIssue(report, commentToBeAddedByFileAndByLine, i));
+
+        return commentToBeAddedByFileAndByLine;
     }
 
-    private Map<InputFile, Map<Integer, StringBuilder>> processIssues(GlobalReport report) {
-        Map<InputFile, Map<Integer, StringBuilder>> commentToBeAddedByFileAndByLine = new HashMap<>();
-        for (Issue issue : projectIssues.issues()) {
-            String severity = issue.severity();
-            boolean isNew = issue.isNew();
-            if (!isNew) {
-                continue;
-            }
-            Integer issueLine = issue.line();
-            InputFile inputFile = inputFileCache.byKey(issue.componentKey());
-            if (gitLabPluginConfiguration.ignoreFileNotModified() && inputFile != null && !commitFacade.hasFile(inputFile)) {
-                continue;
-            }
-            boolean reportedInline = false;
-            if (inputFile != null && issueLine != null) {
-                int line = issueLine.intValue();
-                if (commitFacade.hasFileLine(inputFile, line)) {
-                    String message = issue.message();
-                    String ruleKey = issue.ruleKey().toString();
-                    if (!commentToBeAddedByFileAndByLine.containsKey(inputFile)) {
-                        commentToBeAddedByFileAndByLine.put(inputFile, new HashMap<Integer, StringBuilder>());
-                    }
-                    Map<Integer, StringBuilder> commentsByLine = commentToBeAddedByFileAndByLine.get(inputFile);
-                    if (!commentsByLine.containsKey(line)) {
-                        commentsByLine.put(line, new StringBuilder());
-                    }
-                    commentsByLine.get(line).append(markDownUtils.inlineIssue(severity, message, ruleKey)).append("\n");
-                    reportedInline = true;
-                }
-            }
-            report.process(issue, commitFacade.getGitLabUrl(inputFile, issueLine), reportedInline);
-
+    private void processIssue(GlobalReport report,
+        Map<InputFile, Map<Integer, StringBuilder>> commentToBeAddedByFileAndByLine, PostJobIssue issue) {
+        boolean reportedInline = false;
+        InputComponent inputComponent = issue.inputComponent();
+        if (inputComponent != null && inputComponent.isFile()) {
+            reportedInline = tryReportInline(commentToBeAddedByFileAndByLine, issue, (InputFile) inputComponent);
         }
-        return commentToBeAddedByFileAndByLine;
+        report.process(issue, commitFacade.getGitLabUrl(inputComponent, issue.line()), reportedInline);
+    }
+
+    private boolean tryReportInline(Map<InputFile, Map<Integer, StringBuilder>> commentToBeAddedByFileAndByLine,
+	    PostJobIssue issue, InputFile inputFile) {
+        Integer issueLine = issue.line();
+        if (issueLine != null) {
+            int line = issueLine.intValue();
+            if (commitFacade.hasFileLine(inputFile, line)) {
+                String message = issue.message();
+                String ruleKey = issue.ruleKey().toString();
+                if (!commentToBeAddedByFileAndByLine.containsKey(inputFile)) {
+                    commentToBeAddedByFileAndByLine.put(inputFile, new HashMap<Integer, StringBuilder>());
+                }
+                Map<Integer, StringBuilder> commentsByLine = commentToBeAddedByFileAndByLine.get(inputFile);
+                if (!commentsByLine.containsKey(line)) {
+                    commentsByLine.put(line, new StringBuilder());
+                }
+                commentsByLine.get(line)
+                    .append(markDownUtils.inlineIssue(issue.severity(), message, ruleKey))
+                    .append("\n");
+                return true;
+            }
+        }
+        return false;
     }
 
     private void updateReviewComments(Map<InputFile, Map<Integer, StringBuilder>> commentsToBeAddedByLine) {

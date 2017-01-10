@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>org.sonarsource.parent</groupId>
         <artifactId>parent</artifactId>
-        <version>28</version>
+        <version>38</version>
     </parent>
     <groupId>com.synaptix</groupId>
     <artifactId>sonar-gitlab-plugin</artifactId>
@@ -22,12 +21,11 @@
     <url>https://gitlab.talanlabs.com/gabriel-allaigre/sonar-gitlab-plugin</url>
     <properties>
         <java-gitlab-api.version>1.6.0</java-gitlab-api.version>
-        <freemarker.version>2.3.23</freemarker.version>
 
         <license.mailto>gabriel.allaigre@talanlabs.com</license.mailto>
         <license.owner>Talanlabs</license.owner>
 
-        <sonar.version>5.4-RC1</sonar.version>
+        <sonar.version>6.2</sonar.version>
         <sonar.pluginName>GitLab</sonar.pluginName>
         <sonar.pluginClass>com.synaptix.sonar.plugins.gitlab.GitLabPlugin</sonar.pluginClass>
     </properties>
@@ -90,19 +88,8 @@
             <artifactId>java-gitlab-api</artifactId>
             <version>${java-gitlab-api.version}</version>
         </dependency>
-        <!--dependency>
-            <groupId>org.freemarker</groupId>
-            <artifactId>freemarker</artifactId>
-            <version>${freemarker.version}</version>
-        </dependency-->
 
         <!-- unit tests -->
-        <dependency>
-            <groupId>org.codehaus.sonar</groupId>
-            <artifactId>sonar-batch</artifactId>
-            <version>5.1</version>
-            <scope>test</scope>
-        </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>

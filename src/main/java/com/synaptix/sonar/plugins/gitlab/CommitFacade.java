@@ -1,6 +1,6 @@
 /*
  * SonarQube :: GitLab Plugin
- * Copyright (C) 2016-2016 Talanlabs
+ * Copyright (C) 2016-2017 Talanlabs
  * gabriel.allaigre@talanlabs.com
  *
  * This program is free software; you can redistribute it and/or
@@ -19,30 +19,38 @@
  */
 package com.synaptix.sonar.plugins.gitlab;
 
-import com.synaptix.gitlab.api.GitLabAPI;
-import com.synaptix.gitlab.api.Paged;
-import com.synaptix.gitlab.api.models.commits.GitLabCommitDiff;
-import com.synaptix.gitlab.api.models.projects.GitLabProject;
+import java.io.File;
+import java.io.IOException;
+import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.annotation.Nullable;
+
 import org.apache.commons.io.IOUtils;
-import org.sonar.api.batch.BatchSide;
 import org.sonar.api.batch.InstantiationStrategy;
+import org.sonar.api.batch.ScannerSide;
+import org.sonar.api.batch.fs.InputComponent;
 import org.sonar.api.batch.fs.InputFile;
 import org.sonar.api.batch.fs.InputPath;
 import org.sonar.api.scan.filesystem.PathResolver;
 
-import javax.annotation.Nullable;
-import java.io.File;
-import java.io.IOException;
-import java.io.StringReader;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.synaptix.gitlab.api.GitLabAPI;
+import com.synaptix.gitlab.api.Paged;
+import com.synaptix.gitlab.api.models.commits.GitLabCommitDiff;
+import com.synaptix.gitlab.api.models.projects.GitLabProject;
 
 /**
  * Facade for all WS interaction with GitLab.
  */
 @InstantiationStrategy(InstantiationStrategy.PER_BATCH)
-@BatchSide
+@ScannerSide
 public class CommitFacade {
 
     static final String COMMIT_CONTEXT = "sonarqube";
@@ -55,13 +63,6 @@ public class CommitFacade {
 
     public CommitFacade(GitLabPluginConfiguration config) {
         this.config = config;
-    }
-
-    private static boolean isEqualsNameWithNamespace(String current, String f) {
-        if (current == null || f == null) {
-            return false;
-        }
-        return current.replaceAll(" ", "").equalsIgnoreCase(f.replaceAll(" ", ""));
     }
 
     private static Map<String, Set<Integer>> mapPatchPositionsToLines(List<GitLabCommitDiff> diffs) throws IOException {
@@ -81,7 +82,7 @@ public class CommitFacade {
     private static void processPatch(Set<Integer> patchLocationMapping, String patch) throws IOException {
         int currentLine = -1;
         for (String line : IOUtils.readLines(new StringReader(patch))) {
-            if (line.startsWith("@")) {
+            if (line.startsWith("@@")) {
                 // http://en.wikipedia.org/wiki/Diff_utility#Unified_format
                 Matcher matcher = Pattern.compile("@@\\p{Space}-[0-9]+(?:,[0-9]+)?\\p{Space}\\+([0-9]+)(?:,[0-9]+)?\\p{Space}@@.*").matcher(line);
                 if (!matcher.matches()) {
@@ -127,19 +128,20 @@ public class CommitFacade {
             return null;
         }
         if (new File(baseDir, ".git").exists()) {
-            this.gitBaseDir = baseDir;
+            gitBaseDir = baseDir;
             return baseDir;
         }
         return findGitBaseDir(baseDir.getParentFile());
     }
 
     private GitLabProject getGitLabProject() throws IOException {
-        if (config.projectId() == null) {
+        String projectId = config.projectId();
+        if (projectId == null) {
             throw new IllegalStateException("Unable found project for null project name. Set Configuration sonar.gitlab.project_id");
         }
-        Paged<GitLabProject> paged = gitLabAPI.getGitLabAPIProjects().getProjects(null, null, null, null, null, null);
+        Paged<GitLabProject> paged = gitLabAPI.getGitLabAPIProjects().getProjectAlls(null, null, null, null, null, null);
         if (paged == null) {
-            throw new IllegalStateException("Unable found project for " + config.projectId() + " Verify Configuration sonar.gitlab.project_id or sonar.gitlab.user_token access project");
+            throw new IllegalStateException("Unable found project for " + projectId + " Verify Configuration sonar.gitlab.project_id or sonar.gitlab.user_token access project");
         }
         List<GitLabProject> projects = new ArrayList<>();
         do {
@@ -150,16 +152,16 @@ public class CommitFacade {
 
         List<GitLabProject> res = new ArrayList<>();
         for (GitLabProject project : projects) {
-            if (config.projectId().equals(project.getId().toString()) || config.projectId().equals(project.getPathWithNamespace()) || config.projectId().equals(project.getHttpUrl()) || config
-                    .projectId().equals(project.getSshUrl()) || config.projectId().equals(project.getWebUrl()) || config.projectId().equals(project.getNameWithNamespace())) {
+            if (projectId.equals(project.getId().toString()) || projectId.equals(project.getPathWithNamespace()) || projectId.equals(project.getHttpUrl())
+                || projectId.equals(project.getSshUrl()) || projectId.equals(project.getWebUrl()) || projectId.equals(project.getNameWithNamespace())) {
                 res.add(project);
             }
         }
         if (res.isEmpty()) {
-            throw new IllegalStateException("Unable found project for " + config.projectId() + " Verify Configuration sonar.gitlab.project_id or sonar.gitlab.user_token access project");
+            throw new IllegalStateException("Unable found project for " + projectId + " Verify Configuration sonar.gitlab.project_id or sonar.gitlab.user_token access project");
         }
         if (res.size() > 1) {
-            throw new IllegalStateException("Multiple found projects for " + config.projectId());
+            throw new IllegalStateException("Multiple found projects for " + projectId);
         }
         return res.get(0);
     }
@@ -180,9 +182,9 @@ public class CommitFacade {
         return hasFile(inputFile) && patchPositionMappingByFile.get(getPath(inputFile)).contains(line);
     }
 
-    public String getGitLabUrl(InputFile inputFile, Integer issueLine) {
-        if (inputFile != null) {
-            String path = getPath(inputFile);
+    public String getGitLabUrl(@Nullable InputComponent inputComponent, @Nullable Integer issueLine) {
+	if (inputComponent instanceof InputPath) {
+            String path = getPath((InputPath) inputComponent);
             return gitLabProject.getWebUrl() + "/blob/" + config.commitSHA() + "/" + path + (issueLine != null ? ("#L" + issueLine) : "");
         }
         return null;
@@ -190,7 +192,6 @@ public class CommitFacade {
 
     public void createOrUpdateReviewComment(InputFile inputFile, Integer line, String body) {
         String fullpath = getPath(inputFile);
-        //System.out.println("Review : "+fullpath+" line : "+line);
         try {
             gitLabAPI.getGitLabAPICommits().postCommitComments(gitLabProject.getId(), config.commitSHA(), body, fullpath, line, "new");
         } catch (IOException e) {

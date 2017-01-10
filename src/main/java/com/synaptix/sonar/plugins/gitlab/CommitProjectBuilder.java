@@ -1,6 +1,6 @@
 /*
  * SonarQube :: GitLab Plugin
- * Copyright (C) 2016-2016 Talanlabs
+ * Copyright (C) 2016-2017 Talanlabs
  * gabriel.allaigre@talanlabs.com
  *
  * This program is free software; you can redistribute it and/or
@@ -19,23 +19,25 @@
  */
 package com.synaptix.sonar.plugins.gitlab;
 
+import org.sonar.api.CoreProperties;
+import org.sonar.api.batch.AnalysisMode;
 import org.sonar.api.batch.bootstrap.ProjectBuilder;
-import org.sonar.api.config.Settings;
+import org.sonar.api.utils.MessageException;
 
 /**
- * Trigger load of pull request metadata at the very beginning of SQ analysis. Also
- * set "in progress" status on the pull request.
+ * Trigger load of commit metadata at the very beginning of SQ analysis. Also
+ * set "in progress" status on the commit.
  */
 public class CommitProjectBuilder extends ProjectBuilder {
 
     private final GitLabPluginConfiguration gitLabPluginConfiguration;
-    private final Settings settings;
     private final CommitFacade commitFacade;
+    private final AnalysisMode mode;
 
-    public CommitProjectBuilder(GitLabPluginConfiguration gitLabPluginConfiguration,CommitFacade commitFacade, Settings settings) {
+    public CommitProjectBuilder(GitLabPluginConfiguration gitLabPluginConfiguration, CommitFacade commitFacade, AnalysisMode mode) {
         this.gitLabPluginConfiguration = gitLabPluginConfiguration;
-        this.settings = settings;
         this.commitFacade = commitFacade;
+        this.mode = mode;
     }
 
     @Override
@@ -44,8 +46,15 @@ public class CommitProjectBuilder extends ProjectBuilder {
             return;
         }
 
+        checkMode();
         commitFacade.init(context.projectReactor().getRoot().getBaseDir());
-
         commitFacade.createOrUpdateSonarQubeStatus("pending", "SonarQube analysis in progress");
+    }
+
+    private void checkMode() {
+        if (!mode.isIssues() && !mode.isPreview()) {
+            throw MessageException.of("The GitLab plugin is only intended to be used in preview or issues mode. Please set '"
+                + CoreProperties.ANALYSIS_MODE + "'.");
+        }
     }
 }
