@@ -80,15 +80,4 @@ public class GitLabPluginConfiguration {
     public boolean ignoreFileNotInCommit() {
         return settings.getBoolean(GitLabPlugin.GITLAB_IGNORE_FILE);
     }
-
-    @CheckForNull
-    public String globalTemplate() {
-        return settings.getString(GitLabPlugin.GITLAB_GLOBAL_TEMPLATE);
-    }
-
-    @CheckForNull
-    public String inlineTemplate() {
-        return settings.getString(GitLabPlugin.GITLAB_INLINE_TEMPLATE);
-    }
-
 }

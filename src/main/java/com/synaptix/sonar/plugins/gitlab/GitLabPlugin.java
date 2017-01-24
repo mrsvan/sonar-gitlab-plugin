@@ -80,8 +80,6 @@ public class GitLabPlugin implements Plugin {
     public static final String GITLAB_COMMIT_SHA = "sonar.gitlab.commit_sha";
     public static final String GITLAB_REF_NAME = "sonar.gitlab.ref_name";
     public static final String GITLAB_IGNORE_FILE = "sonar.gitlab.ignore_file";
-    public static final String GITLAB_GLOBAL_TEMPLATE = "sonar.gitlab.global_template";
-    public static final String GITLAB_INLINE_TEMPLATE = "sonar.gitlab.inline_template";
 
     @Override
     public void define(Context context) {
