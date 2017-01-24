@@ -18,9 +18,9 @@ Add build line:
 
 # Usage
 
-For SonarQube >=6.2:
+This plugin uses Sonar Plugin API version 6.2 so **minimum SonarQube version is 6.2**.
 
-- Download last version http://nexus.talanlabs.com/content/groups/public_release/com/synaptix/sonar-gitlab-plugin/1.7.0/sonar-gitlab-plugin-1.7.0.jar
+- Download last version https://github.com/stour/sonar-gitlab-plugin/releases/download/1.8.0/sonar-gitlab-plugin-1.8.0.jar
 - Copy file in extensions directory `SONARQUBE_HOME/extensions/plugins`
 - Restart SonarQube
 
