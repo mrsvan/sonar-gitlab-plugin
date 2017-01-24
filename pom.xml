@@ -9,7 +9,7 @@
     </parent>
     <groupId>com.synaptix</groupId>
     <artifactId>sonar-gitlab-plugin</artifactId>
-    <version>1.8.0-SNAPSHOT</version>
+    <version>1.8.0</version>
     <name>SonarQube :: GitLab Plugin</name>
     <description>GitLab Plugin for Reporting</description>
     <packaging>sonar-plugin</packaging>
@@ -34,6 +34,11 @@
             <id>gabriel.allaigre@talanlabs.com</id>
             <name>Gabriel Allaigre</name>
             <email>gabriel.allaigre@talanlabs.com</email>
+        </developer>
+        <developer>
+            <id>stournie</id>
+            <name>Stephane Tournie</name>
+            <email>sttournie@gmail.com</email>
         </developer>
     </developers>
     <scm>
@@ -115,14 +120,4 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-    <distributionManagement>
-        <repository>
-            <id>talanlabs-releases-repository</id>
-            <url>http://nexus.talanlabs.com/content/repositories/releases/</url>
-        </repository>
-        <snapshotRepository>
-            <id>talanlabs-snapshots-repository</id>
-            <url>http://nexus.talanlabs.com/content/repositories/snapshots/</url>
-        </snapshotRepository>
-    </distributionManagement>
 </project>
